@@ -31,12 +31,23 @@
       android:layout_width="match_parent"
       android:layout_height="?attr/actionBarSize"
       android:layout_alignParentTop="true"
-      android:background="@color/tfe_semi_transparent">
-
-    <ImageView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/tfl2_logo" />
+      android:background="@color/tfe_semi_transparent" >
+  <EditText
+      android:id="@+id/poseTitle"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginLeft="80dp"
+      android:layout_marginTop="10dp"
+      android:ems="10"
+      android:inputType="textPersonName" />
   </androidx.appcompat.widget.Toolbar>
+
+  <Button
+      android:id="@+id/btnShoot"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginLeft="310dp"
+      android:layout_marginTop="10dp"
+      android:text="Shoot" />
 
 </RelativeLayout>

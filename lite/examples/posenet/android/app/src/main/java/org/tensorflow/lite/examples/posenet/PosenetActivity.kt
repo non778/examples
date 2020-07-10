@@ -20,23 +20,10 @@ import android.Manifest
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.ImageFormat
-import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.Rect
-import android.hardware.camera2.CameraAccessException
-import android.hardware.camera2.CameraCaptureSession
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraDevice
-import android.hardware.camera2.CameraManager
-import android.hardware.camera2.CaptureRequest
-import android.hardware.camera2.CaptureResult
-import android.hardware.camera2.TotalCaptureResult
+import android.graphics.*
+import android.hardware.camera2.*
 import android.media.Image
 import android.media.ImageReader
 import android.media.ImageReader.OnImageAvailableListener
@@ -44,29 +31,55 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Process
-import androidx.fragment.app.DialogFragment
-import androidx.fragment.app.Fragment
 import android.util.Log
 import android.util.Size
 import android.util.SparseIntArray
-import android.view.LayoutInflater
-import android.view.Surface
-import android.view.SurfaceHolder
-import android.view.SurfaceView
-import android.view.View
-import android.view.ViewGroup
+import android.view.*
+import android.widget.Button
+import android.widget.EditText
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
-import java.util.concurrent.Semaphore
-import java.util.concurrent.TimeUnit
-import kotlin.math.abs
+import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.Fragment
+import kotlinx.android.synthetic.main.tfe_pn_activity_posenet.*
+import org.json.JSONObject
 import org.tensorflow.lite.examples.posenet.lib.BodyPart
 import org.tensorflow.lite.examples.posenet.lib.Person
 import org.tensorflow.lite.examples.posenet.lib.Posenet
+import java.io.File
+import java.io.FileWriter
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+
 
 class PosenetActivity :
   Fragment(),
-  ActivityCompat.OnRequestPermissionsResultCallback {
+  ActivityCompat.OnRequestPermissionsResultCallback, View.OnClickListener {
+
+  var editPose : EditText? = null
+  private var fcnt : Int = 0 // 프레임 카운트
+  private var btnchk : Int = -1
+  var loc : String = ""
+  /*
+  var nose : String = ""
+  var leftEye : String = ""
+  var rightEye : String = ""
+  var leftEar : String = ""
+  var rightEar : String = ""
+  var leftShoulder : String = ""
+  var rightShoulder : String = ""
+  var leftElbow : String = ""
+  var rightElbow : String = ""
+  var leftWrist : String = ""
+  var rightWrist : String = ""
+  var leftHip : String = ""
+  var rightHip : String = ""
+  var leftKnee : String = ""
+  var rightKnee : String = ""
+  var leftAnkle : String = ""
+  var rightAnkle : String = ""
+  */
 
   /** List of body joints that should be connected.    */
   private val bodyJoints = listOf(
@@ -93,9 +106,9 @@ class PosenetActivity :
   /** Paint class holds the style and color information to draw geometries,text and bitmaps. */
   private var paint = Paint()
 
-  /** A shape for extracting frame data.   */
-  private val PREVIEW_WIDTH = 640
-  private val PREVIEW_HEIGHT = 480
+  /** A shape for extracting frame data.  640, 480 */
+  private val PREVIEW_WIDTH = 1024
+  private val PREVIEW_HEIGHT = 600
 
   /** An object for the Posenet library.    */
   private lateinit var posenet: Posenet
@@ -215,7 +228,86 @@ class PosenetActivity :
 
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     surfaceView = view.findViewById(R.id.surfaceView)
+    val btnShoot = view.findViewById<Button>(R.id.btnShoot) // 버튼 매칭
+    editPose = view.findViewById(R.id.poseTitle) as EditText // 동작명 매칭
+    btnShoot.setOnClickListener(this)
     surfaceHolder = surfaceView!!.holder
+  }
+
+  // 부위별 데이터 저장 변수
+  var bodyLocation = BodyLocation()
+  var jsonPose = JSONObject()
+
+  // 버튼 클릭 리스터
+  override fun onClick(v: View?) {
+    btnchk *= -1
+    if(btnchk < 0)
+    {
+      // json 파일화
+      try {
+        jsonPose.put(editPose?.text.toString(), bodyLocation.getFrame())
+
+        val file = File(context?.filesDir, "Answer_Pose.json")
+
+        val fw = FileWriter(file, false)
+
+        fw.write(jsonPose.toString())
+        fw.flush()
+
+        fw.close()
+
+        var chk_message = Toast.makeText(context,"파일 저장 완료", Toast.LENGTH_SHORT)
+        chk_message.show()
+
+        val chkJson = Intent(this.context, AnswerData::class.java)
+        startActivity(chkJson)
+      }
+      catch(e : Exception)
+      {
+        var chk_message = Toast.makeText(this.context,"파일 저장 실패", Toast.LENGTH_SHORT)
+      }
+
+      this.fcnt = 0
+      this.bodyLocation.bodyLocationClear()
+      editPose?.text = null
+      btnShoot.text = "SHOOT"
+    }
+    else
+    {
+      btnShoot.text = "STOP"
+    }
+  }
+
+  // 프레임별 데이터 저장
+  /*
+  nose : String, lEye : String, rEye : String, lEar : String, rEar : String, lShoulder : String, rShoulder : String,
+  lElbow : String, rElbow : String, lWrist : String, rWrist : String, lHip : String, rHip : String, lKnee : String,
+  rKnee : String, lAnkle : String, rAnkle : String
+   */
+  private fun locationData(loc : String)
+  {
+    /*
+    bodyLocation.setNose(nose)
+    bodyLocation.setLeftEye(lEye)
+    bodyLocation.setRightEye(rEye)
+    bodyLocation.setLeftEar(lEar)
+    bodyLocation.setRightEar(rEar)
+    bodyLocation.setLeftShoulder(lShoulder)
+    bodyLocation.setRightShoulder(rShoulder)
+    bodyLocation.setLeftElbow(lElbow)
+    bodyLocation.setRightElbow(rElbow)
+    bodyLocation.setLeftWrist(lWrist)
+    bodyLocation.setRightWrist(rWrist)
+    bodyLocation.setLeftHip(lHip)
+    bodyLocation.setRightHip(rHip)
+    bodyLocation.setLefKnee(lKnee)
+    bodyLocation.setRightKnee(rKnee)
+    bodyLocation.setLefAnkle(lAnkle)
+    bodyLocation.setRightAnkle(rAnkle)
+    */
+    bodyLocation.setBodyLocation(loc)
+    bodyLocation.setFrame(bodyLocation.getBodyLocation())
+    // 현재 사용 안함
   }
 
   override fun onResume() {
@@ -551,24 +643,87 @@ class PosenetActivity :
       }
     }
 
+    if(btnchk > 0)
+    {
+      /*
+      this.nose += person.keyPoints[0].position.x.toString() + "," + person.keyPoints[0].position.y.toString() + "/"
+      this.leftEye += person.keyPoints[1].position.x.toString() + "," + person.keyPoints[1].position.y.toString() + "/"
+      this.rightEye += person.keyPoints[2].position.x.toString() + "," + person.keyPoints[2].position.y.toString() + "/"
+      this.leftEar += person.keyPoints[3].position.x.toString() + "," + person.keyPoints[3].position.y.toString() + "/"
+      this.rightEar += person.keyPoints[4].position.x.toString() + "," + person.keyPoints[4].position.y.toString() + "/"
+      this.leftShoulder += person.keyPoints[5].position.x.toString() + "," + person.keyPoints[5].position.y.toString() + "/"
+      this.rightShoulder += person.keyPoints[6].position.x.toString() + "," + person.keyPoints[6].position.y.toString() + "/"
+      this.leftElbow += person.keyPoints[7].position.x.toString() + "," + person.keyPoints[7].position.y.toString() + "/"
+      this.rightElbow += person.keyPoints[8].position.x.toString() + "," + person.keyPoints[8].position.y.toString() + "/"
+      this.leftWrist += person.keyPoints[9].position.x.toString() + "," + person.keyPoints[9].position.y.toString() + "/"
+      this.rightWrist += person.keyPoints[10].position.x.toString() + "," + person.keyPoints[10].position.y.toString() + "/"
+      this.leftHip += person.keyPoints[11].position.x.toString() + "," + person.keyPoints[11].position.y.toString() + "/"
+      this.rightHip += person.keyPoints[12].position.x.toString() + "," + person.keyPoints[12].position.y.toString() + "/"
+      this.leftKnee += person.keyPoints[13].position.x.toString() + "," + person.keyPoints[13].position.y.toString() + "/"
+      this.rightKnee += person.keyPoints[14].position.x.toString() + "," + person.keyPoints[14].position.y.toString() + "/"
+      this.leftAnkle += person.keyPoints[15].position.x.toString() + "," + person.keyPoints[15].position.y.toString() + "/"
+      this.rightAnkle += person.keyPoints[16].position.x.toString() + "," + person.keyPoints[16].position.y.toString() + "/"
+      this.fcnt++
+      */
+      /*
+      this.loc += person.keyPoints[0].position.x.toString() + person.keyPoints[0].position.y.toString() +
+             person.keyPoints[1].position.x.toString() + person.keyPoints[1].position.y.toString() +
+             person.keyPoints[2].position.x.toString() + person.keyPoints[2].position.y.toString() +
+             person.keyPoints[3].position.x.toString() + person.keyPoints[3].position.y.toString() +
+             person.keyPoints[4].position.x.toString() + person.keyPoints[4].position.y.toString() +
+             person.keyPoints[5].position.x.toString() + person.keyPoints[5].position.y.toString() +
+             person.keyPoints[6].position.x.toString() + person.keyPoints[6].position.y.toString() +
+             person.keyPoints[7].position.x.toString() + person.keyPoints[7].position.y.toString() +
+             person.keyPoints[8].position.x.toString() + person.keyPoints[8].position.y.toString() +
+             person.keyPoints[9].position.x.toString() + person.keyPoints[9].position.y.toString() +
+             person.keyPoints[10].position.x.toString() + person.keyPoints[10].position.y.toString() +
+             person.keyPoints[11].position.x.toString() + person.keyPoints[11].position.y.toString() +
+             person.keyPoints[12].position.x.toString() + person.keyPoints[12].position.y.toString() +
+             person.keyPoints[13].position.x.toString() + person.keyPoints[13].position.y.toString() +
+             person.keyPoints[14].position.x.toString() + person.keyPoints[14].position.y.toString() +
+             person.keyPoints[15].position.x.toString() + person.keyPoints[15].position.y.toString() +
+             person.keyPoints[16].position.x.toString() + person.keyPoints[16].position.y.toString()
+
+       */
+      this.loc = person.toString()
+      this.fcnt++
+
+      bodyLocation.setBodyLocation(loc)
+      bodyLocation.setFrame(bodyLocation.getBodyLocation())
+    }
+
     canvas.drawText(
       "Score: %.2f".format(person.score),
       (15.0f * widthRatio),
       (30.0f * heightRatio + bottom),
       paint
     )
+//    canvas.drawText(
+//      "Device: %s".format(posenet.device),
+//      (15.0f * widthRatio),
+//      (45.0f * heightRatio + bottom),
+//      paint
+//    )
     canvas.drawText(
-      "Device: %s".format(posenet.device),
+      "Time: %.2f ms / Frame : %d".format(posenet.lastInferenceTimeNanos * 1.0f / 1_000_000, this.fcnt),
       (15.0f * widthRatio),
-      (50.0f * heightRatio + bottom),
+      (45.0f * heightRatio + bottom),
       paint
     )
     canvas.drawText(
-      "Time: %.2f ms".format(posenet.lastInferenceTimeNanos * 1.0f / 1_000_000),
+      "poseName: %s".format(this.editPose?.text.toString()),
       (15.0f * widthRatio),
-      (70.0f * heightRatio + bottom),
+      (60.0f * heightRatio + bottom),
       paint
     )
+    /*
+    canvas.drawText(
+      "loc: %s".format(bodyLocation.getBodyLocation()),
+      (15.0f * widthRatio),
+      (75.0f * heightRatio + bottom),
+      paint
+    )
+    */
 
     // Draw!
     surfaceHolder!!.unlockCanvasAndPost(canvas)
